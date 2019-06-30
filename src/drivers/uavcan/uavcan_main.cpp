@@ -57,6 +57,7 @@
 
 #include <uORB/topics/esc_status.h>
 #include <uORB/topics/parameter_update.h>
+#include <uORB/topics/input_rc.h>
 
 #include <drivers/drv_hrt.h>
 #include <drivers/drv_mixer.h>
@@ -82,6 +83,7 @@ UavcanNode::UavcanNode(uavcan::ICanDriver &can_driver, uavcan::ISystemClock &sys
 	_node_mutex(),
 	_esc_controller(_node),
 	_hardpoint_controller(_node),
+	_rc_data_controller(_node),
 	_time_sync_master(_node),
 	_time_sync_slave(_node),
 	_node_status_monitor(_node),
@@ -146,6 +148,7 @@ UavcanNode::~UavcanNode()
 	(void)orb_unsubscribe(_armed_sub);
 	(void)orb_unsubscribe(_test_motor_sub);
 	(void)orb_unsubscribe(_actuator_direct_sub);
+	(void)orb_unsubscribe(_input_rc_sub);
 
 	// Removing the sensor bridges
 	_sensor_bridges.clear();
@@ -748,6 +751,13 @@ int UavcanNode::run()
 	_test_motor_sub = orb_subscribe(ORB_ID(test_motor));
 	_actuator_direct_sub = orb_subscribe(ORB_ID(actuator_direct));
 
+	_input_rc_sub = orb_subscribe(ORB_ID(input_rc));
+	if (_input_rc_sub == -1) {
+		PX4_ERR("Error orb_subscribe (ERROR)=%d\n",errno);
+		sleep(10);
+		_input_rc_sub = orb_subscribe(ORB_ID(input_rc));
+	}
+
 	memset(&_outputs, 0, sizeof(_outputs));
 
 	/*
@@ -965,6 +975,15 @@ int UavcanNode::run()
 			// Update the test status and check that we're not locked down
 			_test_in_progress = (_test_motor.value > 0);
 			_esc_controller.arm_single_esc(_test_motor.motor_number, _test_in_progress);
+		}
+
+		// Check input_rc state
+		updated = false;
+		orb_check(_input_rc_sub, &updated);
+
+		if (updated) {
+			orb_copy(ORB_ID(input_rc), _input_rc_sub, &_input_rc); // copy data into topic struct
+			_rc_data_controller.update_outputs(_input_rc.values); // send uint16 [18] to CAN-bus
 		}
 
 		// Check arming state
