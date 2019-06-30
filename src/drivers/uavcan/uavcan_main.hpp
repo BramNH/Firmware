@@ -64,6 +64,7 @@
 
 #include "actuators/esc.hpp"
 #include "actuators/hardpoint.hpp"
+#include "actuators/rc_data.hpp"
 #include "sensors/sensor_bridge.hpp"
 
 #include "uavcan_servers.hpp"
@@ -185,6 +186,11 @@ private:
 	px4_sem_t			_server_command_sem;
 	UavcanEscController		_esc_controller;
 	UavcanHardpointController	_hardpoint_controller;
+
+	UavcanRcDataController _rc_data_controller;
+	int _input_rc_sub = -1;						///< uORB subscription of the input_rc status
+	input_rc_s _input_rc;
+
 	uavcan::GlobalTimeSyncMaster	_time_sync_master;
 	uavcan::GlobalTimeSyncSlave	_time_sync_slave;
 	uavcan::NodeStatusMonitor	_node_status_monitor;
